@@ -4,12 +4,22 @@ import javafx.scene.media.Media;
 import javafx.scene.media.MediaPlayer;
 import javafx.util.Duration;
 
+import java.io.File;
+import java.net.URLDecoder;
+import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 
 public class SoundManager {
     private static MediaPlayer player;
     private static ArrayList<Sound> queue = new ArrayList<>();
     public static boolean isPlayerFinished = true;
+    public static Runnable onSongChange;
+
+    public static void queueAllInFolder(String dir) {
+        for (File file : FileHelper.getAudioFilesInDir(dir)) {
+            addToQueue(new Sound(file));
+        }
+    }
 
     public static void addToQueue(Sound sound) {
         boolean wasEmpty = queue.isEmpty();
@@ -42,7 +52,16 @@ public class SoundManager {
             player.setOnEndOfMedia(() -> {
                 isPlayerFinished = true;
                 playNextInQueue();
+
+                if (onSongChange != null) {
+                    onSongChange.run();
+                }
             });
+        }
+
+        if (onSongChange != null) {
+            player.setOnPlaying(onSongChange);
+            onSongChange.run();
         }
 
         player.play();
@@ -71,5 +90,27 @@ public class SoundManager {
     }
     public static Duration getTimeLeft() {
         return player.getStopTime().subtract(player.getCurrentTime());
+    }
+
+    public static boolean isPlayerPaused() {
+        if (player == null) return true;
+
+        return player.getStatus() == MediaPlayer.Status.PAUSED;
+    }
+    public static void setOnSongChange(Runnable run) {
+        onSongChange = run;
+    }
+
+    public static String getSongName() {
+        if (player == null) return "";
+
+        String source = player.getMedia().getSource();
+        String uriEncoded = source.substring(source.lastIndexOf("/") + 1, source.lastIndexOf("."));
+
+        try {
+            return URLDecoder.decode(uriEncoded, StandardCharsets.UTF_8.toString());
+        } catch (Exception e) {
+            return "";
+        }
     }
 }
